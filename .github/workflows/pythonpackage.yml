@@ -7,7 +7,7 @@ jobs:
 
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
+      max-parallel: 3
       matrix:
         python-version: [3.5, 3.6, 3.7]
 
@@ -28,7 +28,9 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+    - name: Package wheel
       run: |
-        pip install pytest
-        pytest
+        pip install wheel
+        python setup.py bdist_wheel
+        ls -lah dist/
+        find dist -name "*whl" -exec unzip -l '{}' \;
