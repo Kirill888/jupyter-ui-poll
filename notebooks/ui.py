@@ -1,5 +1,7 @@
-import ipywidgets as w
+""" Sample UI used in the example notebook.
+"""
 from types import SimpleNamespace
+import ipywidgets as w
 
 
 def make_sample_ui(width="600px"):
@@ -20,13 +22,15 @@ def make_sample_ui(width="600px"):
       .progress -- FloatProgress(0, 10)
       .dbg      -- Output()
     """
-    colors=['lime', 'olive', 'tomato', 'salmon', 'wheat', 'orange', 'plum']
+    colors = ['lime', 'olive', 'tomato', 'salmon', 'wheat', 'orange', 'plum']
 
-    progress = w.FloatProgress(value=0, min=0, max=10,
+    progress = w.FloatProgress(value=0,
+                               min=0,
+                               max=10,
                                description='',
                                layout=w.Layout(width='100%'))
     lbl = w.HTML('<center><h2>Pick your favorite food color</h2></center>',
-                  layout=w.Layout(width="100%"))
+                 layout=w.Layout(width="100%"))
 
     state = SimpleNamespace(color=None,
                             progress=progress,
@@ -39,15 +43,13 @@ def make_sample_ui(width="600px"):
             print("\nClicked {}".format(btn.description))
 
     def mk_btn(color):
-        b = w.Button(description=color,
-                     style=dict(button_color=color))
-        b.on_click(on_btn_click)
-        return b
+        btn = w.Button(description=color, style=dict(button_color=color))
+        btn.on_click(on_btn_click)
+        return btn
 
     state.ui = w.VBox([lbl,
                        progress,
                        w.HBox([mk_btn(color) for color in colors]),
                        state.dbg],
-                      layout=w.Layout(width=width,
-                                      overflow='hidden'))
+                      layout=w.Layout(width=width, overflow='hidden'))
     return state
