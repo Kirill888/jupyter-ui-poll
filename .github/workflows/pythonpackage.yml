@@ -32,5 +32,11 @@ jobs:
       run: |
         pip install wheel
         python setup.py bdist_wheel
-        ls -lah dist/
         find dist -name "*whl" -exec unzip -l '{}' \;
+    - name: Package source distribution
+      run: |
+        python setup.py sdist
+    - name: Check Distribution Files
+      run: |
+        pip install twine
+        twine check dist/*
