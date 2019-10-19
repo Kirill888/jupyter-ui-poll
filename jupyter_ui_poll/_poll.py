@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from IPython import get_ipython
 import asyncio
 from warnings import warn
@@ -17,6 +18,52 @@ def _replay_events(shell, events):
             break
 
 
+@contextmanager
+def ui_events():
+    """ Gives you a function you can call to process ui events while running a long
+    task inside a Jupyter cell.
+
+
+    .. code-block: python
+       with ui_events() as ui_poll:
+          while some_condition:
+             ui_poll(10)  # Process upto 10 UI events if any happened
+             do_some_more_compute()
+
+
+    - Delay processing `execute_request` IPython kernel events
+    - Calls `kernel.do_one_iteration()`
+    - Schedule replay of any blocked `execute_request` events upon
+      exiting from the context manager
+    """
+
+    shell = get_ipython()
+    kernel = shell.kernel
+    events = []
+    kernel.shell_handlers['execute_request'] = lambda *e: events.append(e)
+    current_parent = (kernel._parent_ident, kernel._parent_header)
+
+    # shell.execution_count += 1
+
+    def poll(n=1):
+        for _ in range(n):
+            kernel.do_one_iteration()
+            # ensure stdout still happens in the same cell
+            kernel.set_parent(*current_parent)
+
+    try:
+        yield poll
+    finally:
+        kernel.shell_handlers['execute_request'] = kernel.execute_request
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.call_soon(lambda: _replay_events(shell, events))
+        else:
+            warn(
+                'Automatic execution of scheduled cells only works with asyncio based ipython'
+            )
+
+
 def with_ui_events(its, n=1):
     """ Deal with kernel ui events while processing a long sequence
 
@@ -27,40 +74,18 @@ def with_ui_events(its, n=1):
     - Inject calls to `kernel.do_one_iteration()` in between iterations
     - Schedule replay of any blocked `execute_request` events when data sequence is exhausted
     """
-    shell = get_ipython()
-    kernel = shell.kernel
-    events = []
-    kernel.shell_handlers['execute_request'] = lambda *e: events.append(e)
-    current_parent = (kernel._parent_ident, kernel._parent_header)
-    # shell.execution_count += 1
-
-    def cleanup():
-        kernel.shell_handlers['execute_request'] = kernel.execute_request
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.call_soon(lambda: _replay_events(shell, events))
-        else:
-            warn(
-                'Automatic execution of scheduled cells only works with asyncio based ipython'
-            )
-
-    try:
-        for x in its:
-            for _ in range(n):
-                kernel.do_one_iteration()
-                # ensure stdout still happens in the same cell
-                kernel.set_parent(*current_parent)
-
-            yield x
-    except GeneratorExit:
-        pass
-    except Exception as e:
-        raise e
-    finally:
-        cleanup()
+    with ui_events() as poll:
+        try:
+            for x in its:
+                poll(n)
+                yield x
+        except GeneratorExit:
+            pass
+        except Exception as e:
+            raise e
 
 
-def ui_poll(f, sleep=0.02, n=1):
+def run_ui_poll_loop(f, sleep=0.02, n=1):
     """Repeatedly call `f()` until it returns non-None value while also responding to widget events.
 
     This blocks execution of cells below in the notebook while still preserving
