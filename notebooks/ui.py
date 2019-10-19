@@ -1,7 +1,10 @@
 """ Sample UI used in the example notebook.
 """
+import time
 from types import SimpleNamespace
 import ipywidgets as w
+from IPython.display import display
+from jupyter_ui_poll import run_ui_poll_loop
 
 
 def make_sample_ui(width="600px"):
@@ -26,7 +29,7 @@ def make_sample_ui(width="600px"):
 
     progress = w.FloatProgress(value=0,
                                min=0,
-                               max=10,
+                               max=1,
                                description='',
                                layout=w.Layout(width='100%'))
     lbl = w.HTML('<center><h2>Pick your favorite food color</h2></center>',
@@ -53,3 +56,47 @@ def make_sample_ui(width="600px"):
                        state.dbg],
                       layout=w.Layout(width=width, overflow='hidden'))
     return state
+
+
+def blocking_ui(default='beige', timeout=10):
+    """ Displays a UI then blocks until user makes a choice or timeout happens.
+
+        Returns
+        =======
+         (color, 'user')             if user selects a color in time
+         (default, 'timeout')  in case of a timeout
+    """
+    state = make_sample_ui()
+
+    def poll_cbk():
+        """ This function is called 10 times a second
+        """
+        if state.color is not None:      # User selected some color
+            return state.color, 'user'
+        # no action from user so far
+
+        # update progress bar
+        progress = state.progress
+        progress.value = progress.max*(time.time() - state.t_start)/timeout
+
+        if progress.value > 0.7*progress.max:
+            if progress.bar_style != 'danger':
+                with state.dbg:
+                    print('Hurry!!!')
+
+            progress.bar_style = 'danger'
+
+        if progress.value >= progress.max:
+            with state.dbg:
+                print("\nTimes UP!")
+            return default, 'timeout'    # Terminate -- out of time
+
+        # continue polling
+        return None
+
+    display(state.ui)
+    state.t_start = time.time()
+
+    # call poll_cbk @ 25 fps,
+    # process 4 ui events between calls
+    return run_ui_poll_loop(poll_cbk, 1/25, 4)
