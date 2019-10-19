@@ -12,10 +12,10 @@ def _replay_events(shell, events):
     sys.stderr.flush()
     for stream, ident, parent in events:
         kernel.set_parent(ident, parent)
-        kernel.execute_request(stream, ident, parent)
-        if shell._last_traceback is not None:
-            # there was an exception drop rest on the floor
-            break
+        if kernel._aborting:
+            kernel._send_abort_reply(stream, parent, ident)
+        else:
+            kernel.execute_request(stream, ident, parent)
 
 
 @contextmanager
