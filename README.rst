@@ -2,6 +2,9 @@
 jupyter-ui-poll
 ===============
 
+.. image:: https://mybinder.org/badge_logo.svg
+ :target: https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/binder?filepath=notebooks%2FExamples.ipynb
+
 Block Jupyter cell execution while interacting with widgets.
 
 This library is for people familiar with ``ipywidgets`` who want to solve the
