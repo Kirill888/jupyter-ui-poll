@@ -47,11 +47,13 @@ def ui_events():
 
     def poll(n=1):
         for _ in range(n):
-            kernel.do_one_iteration()
             # ensure stdout still happens in the same cell
+            kernel.set_parent(*current_parent)
+            kernel.do_one_iteration()
             kernel.set_parent(*current_parent)
 
     try:
+        poll()  # ensure poll is called at least once to correct output redirect
         yield poll
     finally:
         kernel.shell_handlers['execute_request'] = kernel.execute_request
