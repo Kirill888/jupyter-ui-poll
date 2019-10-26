@@ -19,7 +19,6 @@ jupyter==1.0.0
 jupyter-client==5.3.4
 jupyter-console==6.0.0
 jupyter-core==4.6.1
-jupyter-ui-poll==0.1.0
 kiwisolver==1.1.0
 MarkupSafe==1.1.1
 matplotlib==3.1.1
@@ -56,3 +55,4 @@ webencodings==0.5.1
 widgetsnbextension==3.5.1
 xarray==0.14.0
 zipp==0.6.0
+jupyter-ui-poll
