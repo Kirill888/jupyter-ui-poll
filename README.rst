@@ -3,7 +3,7 @@ jupyter-ui-poll
 ===============
 
 .. image:: https://mybinder.org/badge_logo.svg
- :target: https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/binder?filepath=notebooks%2FExamples.ipynb
+ :target: `run it`_
 
 Block Jupyter cell execution while interacting with widgets.
 
@@ -34,7 +34,7 @@ And you want to be able to execute ``Cells -> Run All`` menu option and still ge
 This library assists in implementing your custom ``ui.wait_for_data()`` poll loop.
 If you have tried implementing such workflow in the past you'll know that it is
 not that simple. If you haven't, see `Technical Details`_ section below for an
-explanation why it's hard and how ``jupyter-ui-poll`` solves it.
+explanation on why it's hard and how ``jupyter-ui-poll`` solves it.
 
 Quick, self contained example:
 
@@ -64,7 +64,7 @@ Quick, self contained example:
            time.sleep(0.1)
    print('done')
 
-For a more detailed tutorial see `Example notebook`_
+For a more detailed tutorial see `Example notebook`_, you can also `run it`_ right now using awesome `Binder`_ service.
 
 Installation
 ============
@@ -142,3 +142,5 @@ Basic idea was copied from ``ipython_blocking`` [#]_ project:
 .. [#] https://github.com/kafonek/ipython_blocking
 
 .. _Example notebook : notebooks/Examples.ipynb
+.. _run it : https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/binder?filepath=notebooks%2FExamples.ipynb
+.. _Binder : https://mybinder.org/
