@@ -90,7 +90,7 @@ other kinds of computation.
 Interactivity is handled with callbacks, ``ipywidget`` GUI is HTML based, user
 actions, like clicking a button, trigger JavaScript events that are then
 translated in to calls to Python code developer registered with the library. It
-is a significantly different, asynchronous, paradigm then your basic Jupyter
+is a significantly different, asynchronous, paradigm than your basic Jupyter
 notebook which operates in a straightforward blocking, linear fashion. It is not
 possible to display a Modal UI that would block execution of other Jupyter cells
 until needed information is supplied by the user.
