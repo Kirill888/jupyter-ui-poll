@@ -38,4 +38,3 @@ jobs:
       env:
         TWINE_USERNAME: '__token__'
         TWINE_PASSWORD: ${{ secrets.pypi_token }}
-        TWINE_REPOSITORY_URL: 'https://pypi.org/legacy/'
