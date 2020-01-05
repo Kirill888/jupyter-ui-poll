@@ -1,6 +1,16 @@
-name: Python package
+name: build
 
-on: [push]
+on:
+  pull_request:
+    paths:
+      - '**'
+
+  push:
+    paths:
+      - '**'
+      - '!notebooks/**'
+      - '!scripts/**'
+      - '!binder/**'
 
 jobs:
   build:
@@ -40,3 +50,17 @@ jobs:
       run: |
         pip install twine
         twine check dist/*
+
+    - name: Publish (test pypi)
+      if: |
+        github.event_name == 'push' && (
+          github.ref == 'refs/heads/master'
+        )
+
+      run: |
+        twine upload --verbose --disable-progress-bar --skip-existing dist/*
+
+      env:
+        TWINE_USERNAME: '__token__'
+        TWINE_PASSWORD: ${{ secrets.test_pypi_token }}
+        TWINE_REPOSITORY_URL: 'https://test.pypi.org/legacy/'
