@@ -21,9 +21,9 @@ def make_sample_ui(width="600px"):
     Returns object with properties:
 
       .ui       -- Top level ui container `display(state.ui)`
-      .color    -- None set to text when user select color by pressing button
+      .color    -- None initially, set to text when user select color by pressing button
       .progress -- FloatProgress(0, 10)
-      .dbg      -- Output()
+      .dbg      -- ipywidgets.Output()
     """
     colors = ['lime', 'olive', 'tomato', 'salmon', 'wheat', 'orange', 'plum']
 
@@ -63,13 +63,23 @@ def blocking_ui(default='beige', timeout=10):
 
         Returns
         =======
-         (color, 'user')             if user selects a color in time
+         (color, 'user')       if user selects a color in time
          (default, 'timeout')  in case of a timeout
     """
     state = make_sample_ui()
 
     def poll_cbk():
-        """ This function is called 10 times a second
+        """ This function is called periodically.
+
+            - Check for user input
+            - Check for timeout
+            - Update timeout progress bar
+
+            Returns
+            -------
+            (color: str, 'user')      -- when user selection detected
+            (default: str, 'timeout') -- when no user selection for too long
+            None                      -- in all other cases
         """
         if state.color is not None:      # User selected some color
             return state.color, 'user'
