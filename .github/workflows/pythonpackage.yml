@@ -58,7 +58,7 @@ jobs:
         )
 
       run: |
-        twine upload --verbose --disable-progress-bar --skip-existing dist/*
+        twine upload --verbose --disable-progress-bar --skip-existing dist/* || true
 
       env:
         TWINE_USERNAME: '__token__'
