@@ -3,7 +3,7 @@
 env_dir="${1:-env}"
 python3 -m venv "${env_dir}"
 source "${env_dir}/bin/activate"
-pip install -U pip
+pip install -U pip setuptools wheel
 pip install -e .
 pip install jupyter ipywidgets ipyleaflet
 
