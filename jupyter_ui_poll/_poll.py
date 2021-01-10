@@ -20,9 +20,9 @@ def _replay_events(shell, events):
 
 @contextmanager
 def ui_events():
-    """ Gives you a function you can call to process ui events while running a long
+    """
+    Gives you a function you can call to process ui events while running a long
     task inside a Jupyter cell.
-
 
     .. code-block: python
        with ui_events() as ui_poll:
@@ -40,10 +40,8 @@ def ui_events():
     shell = get_ipython()
     kernel = shell.kernel
     events = []
-    kernel.shell_handlers['execute_request'] = lambda *e: events.append(e)
+    kernel.shell_handlers["execute_request"] = lambda *e: events.append(e)
     current_parent = (kernel._parent_ident, kernel._parent_header)
-
-    # shell.execution_count += 1
 
     def poll(n=1):
         for _ in range(n):
@@ -56,18 +54,19 @@ def ui_events():
         poll()  # ensure poll is called at least once to correct output redirect
         yield poll
     finally:
-        kernel.shell_handlers['execute_request'] = kernel.execute_request
+        kernel.shell_handlers["execute_request"] = kernel.execute_request
         loop = asyncio.get_event_loop()
         if loop.is_running():
             loop.call_soon(lambda: _replay_events(shell, events))
         else:
             warn(
-                'Automatic execution of scheduled cells only works with asyncio based ipython'
+                "Automatic execution of scheduled cells only works with asyncio based ipython"
             )
 
 
 def with_ui_events(its, n=1):
-    """ Deal with kernel ui events while processing a long sequence
+    """
+    Deal with kernel ui events while processing a long sequence
 
     :param its: Iterator to pass through
     :param n:   Number of events to process in between items
@@ -88,7 +87,8 @@ def with_ui_events(its, n=1):
 
 
 def run_ui_poll_loop(f, sleep=0.02, n=1):
-    """Repeatedly call `f()` until it returns non-None value while also responding to widget events.
+    """
+    Repeatedly call `f()` until it returns non-None value while also responding to widget events.
 
     This blocks execution of cells below in the notebook while still preserving
     interactivity of jupyter widgets.
@@ -101,6 +101,7 @@ def run_ui_poll_loop(f, sleep=0.02, n=1):
     =======
     First non-None value returned from `f()`
     """
+
     def as_iterator(f, sleep):
         x = None
         while x is None:
