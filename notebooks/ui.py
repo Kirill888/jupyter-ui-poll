@@ -25,20 +25,17 @@ def make_sample_ui(width="600px"):
       .progress -- FloatProgress(0, 10)
       .dbg      -- ipywidgets.Output()
     """
-    colors = ['lime', 'olive', 'tomato', 'salmon', 'wheat', 'orange', 'plum']
+    colors = ["lime", "olive", "tomato", "salmon", "wheat", "orange", "plum"]
 
-    progress = w.FloatProgress(value=0,
-                               min=0,
-                               max=1,
-                               description='',
-                               layout=w.Layout(width='100%'))
-    lbl = w.HTML('<center><h2>Pick your favorite food color</h2></center>',
-                 layout=w.Layout(width="100%"))
+    progress = w.FloatProgress(
+        value=0, min=0, max=1, description="", layout=w.Layout(width="100%")
+    )
+    lbl = w.HTML(
+        "<center><h2>Pick your favorite food color</h2></center>",
+        layout=w.Layout(width="100%"),
+    )
 
-    state = SimpleNamespace(color=None,
-                            progress=progress,
-                            ui=None,
-                            dbg=w.Output())
+    state = SimpleNamespace(color=None, progress=progress, ui=None, dbg=w.Output())
 
     def on_btn_click(btn):
         state.color = btn.description
@@ -50,15 +47,14 @@ def make_sample_ui(width="600px"):
         btn.on_click(on_btn_click)
         return btn
 
-    state.ui = w.VBox([lbl,
-                       progress,
-                       w.HBox([mk_btn(color) for color in colors]),
-                       state.dbg],
-                      layout=w.Layout(width=width, overflow='hidden'))
+    state.ui = w.VBox(
+        [lbl, progress, w.HBox([mk_btn(color) for color in colors]), state.dbg],
+        layout=w.Layout(width=width, overflow="hidden"),
+    )
     return state
 
 
-def blocking_ui(default='beige', timeout=10):
+def blocking_ui(default="beige", timeout=10):
     """ Displays a UI then blocks until user makes a choice or timeout happens.
 
         Returns
@@ -81,25 +77,25 @@ def blocking_ui(default='beige', timeout=10):
             (default: str, 'timeout') -- when no user selection for too long
             None                      -- in all other cases
         """
-        if state.color is not None:      # User selected some color
-            return state.color, 'user'
+        if state.color is not None:  # User selected some color
+            return state.color, "user"
         # no action from user so far
 
         # update progress bar
         progress = state.progress
-        progress.value = progress.max*(time.time() - state.t_start)/timeout
+        progress.value = progress.max * (time.time() - state.t_start) / timeout
 
-        if progress.value > 0.7*progress.max:
-            if progress.bar_style != 'danger':
+        if progress.value > 0.7 * progress.max:
+            if progress.bar_style != "danger":
                 with state.dbg:
-                    print('Hurry!!!')
+                    print("Hurry!!!")
 
-            progress.bar_style = 'danger'
+            progress.bar_style = "danger"
 
         if progress.value >= progress.max:
             with state.dbg:
                 print("\nTimes UP!")
-            return default, 'timeout'    # Terminate -- out of time
+            return default, "timeout"  # Terminate -- out of time
 
         # continue polling
         return None
@@ -109,4 +105,4 @@ def blocking_ui(default='beige', timeout=10):
 
     # call poll_cbk @ 25 fps,
     # process 4 ui events between calls
-    return run_ui_poll_loop(poll_cbk, 1/25, 4)
+    return run_ui_poll_loop(poll_cbk, 1 / 25, 4)
