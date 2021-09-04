@@ -69,7 +69,16 @@ For a more detailed tutorial see `Example notebook`_, you can also `run it`_ rig
 Installation
 ============
 
-This library requires Python 3.6 or greater
+This library requires Python 3.6 or greater.
+
+.. note::
+
+   Starting from version ``0.2.0`` we only support ``ipykernel`` version 6
+   series. Version 6 of ``ipykernel`` now uses async internally, and so this
+   library also switched to async. If you need to support ``ipykernel`` 5
+   series, then you need to use ``jupyter-ui-poll==0.1.3`` which had synchronous
+   interface.
+
 
 .. code-block::
 
