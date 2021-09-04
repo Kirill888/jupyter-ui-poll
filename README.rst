@@ -7,6 +7,10 @@ jupyter-ui-poll
 
 Block Jupyter cell execution while interacting with widgets.
 
+.. note::
+
+   This version only works with ipykernel 5.* series. 
+
 This library is for people familiar with ``ipywidgets`` who want to solve the
 following problem:
 
