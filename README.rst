@@ -71,7 +71,7 @@ Installation
 
 This library requires Python 3.6 or greater
 
-::
+.. code-block::
 
   pip install jupyter-ui-poll
 
