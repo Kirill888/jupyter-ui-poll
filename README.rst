@@ -7,10 +7,6 @@ jupyter-ui-poll
 
 Block Jupyter cell execution while interacting with widgets.
 
-.. note::
-
-   This version only works with ipykernel 5.* series. 
-
 This library is for people familiar with ``ipywidgets`` who want to solve the
 following problem:
 
@@ -63,7 +59,7 @@ Quick, self contained example:
    # Wait for user to press the button
    with ui_events() as poll:
        while ui_done is False:
-           poll(10)                # React to UI events (upto 10 at a time)
+           await poll(10)          # React to UI events (upto 10 at a time)
            print('.', end='')
            time.sleep(0.1)
    print('done')
@@ -73,7 +69,7 @@ For a more detailed tutorial see `Example notebook`_, you can also `run it`_ rig
 Installation
 ============
 
-This library requires Python 3.5 or greater
+This library requires Python 3.6 or greater
 
 ::
 
