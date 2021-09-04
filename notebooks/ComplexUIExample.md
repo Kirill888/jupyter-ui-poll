@@ -26,7 +26,7 @@ Run this notebook using `Cell -> Run All` menu option.
 from ipywidgets import HTML
 from ui import blocking_ui
 
-color, mode = blocking_ui(default='beige', timeout=10)
+color, mode = await blocking_ui(default='beige', timeout=10)
 ```
 
 ```python

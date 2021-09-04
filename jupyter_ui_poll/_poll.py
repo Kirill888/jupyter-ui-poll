@@ -1,13 +1,14 @@
-from contextlib import contextmanager
-from IPython import get_ipython
 import asyncio
-from warnings import warn
-import time
 import sys
+import time
+from contextlib import contextmanager
+
+import zmq
+from IPython import get_ipython
+from tornado.queues import QueueEmpty
 
 
-def _replay_events(shell, events):
-    kernel = shell.kernel
+async def _replay_events(kernel, events):
     sys.stdout.flush()
     sys.stderr.flush()
     for stream, ident, parent in events:
@@ -15,19 +16,24 @@ def _replay_events(shell, events):
         if kernel._aborting:
             kernel._send_abort_reply(stream, parent, ident)
         else:
-            kernel.execute_request(stream, ident, parent)
+            await kernel.execute_request(stream, ident, parent)
+            # replicate shell_dispatch behaviour
+            sys.stdout.flush()
+            sys.stderr.flush()
+            kernel._publish_status('idle', 'shell')
+            kernel.shell_stream.flush(zmq.POLLOUT)
 
 
 @contextmanager
 def ui_events():
     """
-    Gives you a function you can call to process ui events while running a long
+    Gives you a async function you can call to process ui events while running a long
     task inside a Jupyter cell.
 
     .. code-block: python
        with ui_events() as ui_poll:
           while some_condition:
-             ui_poll(10)  # Process upto 10 UI events if any happened
+             await ui_poll(10)  # Process upto 10 UI events if any happened
              do_some_more_compute()
 
 
@@ -36,35 +42,40 @@ def ui_events():
     - Schedule replay of any blocked `execute_request` events upon
       exiting from the context manager
     """
-
     shell = get_ipython()
     kernel = shell.kernel
+    _backup_execute_request = kernel.shell_handlers["execute_request"]
+    original_parent = (kernel._parent_ident, kernel.get_parent())
+
     events = []
-    kernel.shell_handlers["execute_request"] = lambda *e: events.append(e)
-    current_parent = (kernel._parent_ident, kernel._parent_header)
 
-    def poll(n=1):
+    async def _execute_request(stream, ident, parent):
+        # store away execute request for later and reset io back to the original cell
+        events.append((stream, ident, parent))
+        kernel.set_parent(*original_parent)
+
+    async def poll(n=1):
         for _ in range(n):
-            # ensure stdout still happens in the same cell
-            kernel.set_parent(*current_parent)
-            kernel.do_one_iteration()
-            kernel.set_parent(*current_parent)
+            try:
+                await kernel.do_one_iteration()
+                # reset stdio back to original cell
+                kernel.set_parent(*original_parent)
+            except QueueEmpty:  # it's probably a bug in ipykernel, .do_one_iteration() should not throw
+                return
 
+    loop = asyncio.get_event_loop()
+    assert loop.is_running()
+
+    kernel.shell_handlers["execute_request"] = _execute_request
     try:
-        poll()  # ensure poll is called at least once to correct output redirect
         yield poll
     finally:
-        kernel.shell_handlers["execute_request"] = kernel.execute_request
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.call_soon(lambda: _replay_events(shell, events))
-        else:
-            warn(
-                "Automatic execution of scheduled cells only works with asyncio based ipython"
-            )
+        # Restore execute_request handler
+        kernel.shell_handlers["execute_request"] = _backup_execute_request
+        asyncio.ensure_future(_replay_events(kernel, events), loop=loop)
 
 
-def with_ui_events(its, n=1):
+async def with_ui_events(its, n=1):
     """
     Deal with kernel ui events while processing a long sequence
 
@@ -78,7 +89,7 @@ def with_ui_events(its, n=1):
     with ui_events() as poll:
         try:
             for x in its:
-                poll(n)
+                await poll(n)
                 yield x
         except GeneratorExit:
             pass
@@ -86,7 +97,7 @@ def with_ui_events(its, n=1):
             raise e
 
 
-def run_ui_poll_loop(f, sleep=0.02, n=1):
+async def run_ui_poll_loop(f, sleep=0.02, n=1):
     """
     Repeatedly call `f()` until it returns non-None value while also responding to widget events.
 
@@ -111,6 +122,6 @@ def run_ui_poll_loop(f, sleep=0.02, n=1):
             x = f()
             yield x
 
-    for x in with_ui_events(as_iterator(f, sleep), n):
+    async for x in with_ui_events(as_iterator(f, sleep), n):
         if x is not None:
             return x

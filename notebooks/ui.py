@@ -54,7 +54,7 @@ def make_sample_ui(width="600px"):
     return state
 
 
-def blocking_ui(default="beige", timeout=10):
+async def blocking_ui(default="beige", timeout=10):
     """ Displays a UI then blocks until user makes a choice or timeout happens.
 
         Returns
@@ -105,4 +105,4 @@ def blocking_ui(default="beige", timeout=10):
 
     # call poll_cbk @ 25 fps,
     # process 4 ui events between calls
-    return run_ui_poll_loop(poll_cbk, 1 / 25, 4)
+    return await run_ui_poll_loop(poll_cbk, 1 / 25, 4)

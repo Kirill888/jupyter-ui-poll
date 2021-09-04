@@ -90,7 +90,7 @@ display(btn)
 with ui_events() as ui_poll:
     while int(btn.description) < 10:
         print(btn.description, end="")
-        ui_poll(11)  # Process upto 11 ui events per iteration
+        await ui_poll(11)  # Process upto 11 ui events per iteration
         time.sleep(0.1)
 
 print("... done")
@@ -112,7 +112,7 @@ btn = test_button()
 print("Press this button a few times")
 display(btn)
 
-for i in with_ui_events(range(55), 10):  # Process upto 10 ui events per iteration
+async for i in with_ui_events(range(55), 10):  # Process upto 10 ui events per iteration
     if int(btn.description) >= 5:
         print("✋", end="")
         break  # Test early exit
@@ -176,7 +176,7 @@ btn = test_button()
 print("Press button 10 times")
 display(btn)
 
-dt = run_ui_poll_loop(on_poll, 1 / 15)
+dt = await run_ui_poll_loop(on_poll, 1 / 15)
 print("._.")  # This should display the text in the output of this cell
 n_times = "10 times"  # To verify that the rest of this cell executes before executing cells below
 ```
