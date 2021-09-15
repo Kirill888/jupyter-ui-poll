@@ -57,7 +57,7 @@ Quick, self contained example:
    display(btn)
 
    # Wait for user to press the button
-   with ui_events() as poll:
+   async with ui_events() as poll:
        while ui_done is False:
            await poll(10)          # React to UI events (upto 10 at a time)
            print('.', end='')
