@@ -5,8 +5,8 @@ jupyter:
     text_representation:
       extension: .md
       format_name: markdown
-      format_version: '1.2'
-      jupytext_version: 1.5.2
+      format_version: '1.3'
+      jupytext_version: 1.11.3
   kernelspec:
     display_name: Python 3
     language: python
@@ -26,7 +26,7 @@ Run this notebook using `Cell -> Run All` menu option.
 from ipywidgets import HTML
 from ui import blocking_ui
 
-color, mode = await blocking_ui(default='beige', timeout=10)
+color, mode = blocking_ui(default='beige', timeout=10)
 ```
 
 ```python
