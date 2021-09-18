@@ -1,11 +1,12 @@
 import asyncio
 import sys
 import time
-from contextlib import contextmanager
 
 import zmq
 from IPython import get_ipython
 from tornado.queues import QueueEmpty
+
+from ._async_thread import AsyncThread
 
 
 class KernelWrapper:
@@ -20,6 +21,7 @@ class KernelWrapper:
         self._original_parent = (kernel._parent_ident, kernel.get_parent())
         self._events = []
         self._backup_execute_request = kernel.shell_handlers["execute_request"]
+        self._aproc = None
 
         shell.events.register("post_run_cell", self._post_run_cell_hook)
         kernel.shell_handlers["execute_request"] = self._execute_request_async
@@ -72,6 +74,29 @@ class KernelWrapper:
         KernelWrapper._current = None
         asyncio.ensure_future(self.replay(), loop=self._loop)
 
+    async def _poll_async(self, n=1):
+        for _ in range(n):
+            await self.do_one_iteration()
+
+    async def __aenter__(self):
+        return self._poll_async
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def __enter__(self):
+        if self._aproc is not None:
+            raise ValueError("Nesting not supported")
+        self._aproc = AsyncThread()
+        return self._aproc.wrap(self._poll_async)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._aproc.terminate()
+        self._aproc = None
+
+    def wrap_iterator(self, its, n: int = 1):
+        return IteratorWrapper(its, self, n=n)
+
     @staticmethod
     def get():
         if KernelWrapper._current is None:
@@ -79,11 +104,41 @@ class KernelWrapper:
         return KernelWrapper._current
 
 
-@contextmanager
+class IteratorWrapper:
+    def __init__(self, its, kernel: KernelWrapper, n: int = 1):
+        self._its = its
+        self._n = n
+        self._kernel = kernel
+
+    def __iter__(self):
+        def _loop(kernel, its, n):
+            with kernel as poll:
+                try:
+                    for x in its:
+                        poll(n)
+                        yield x
+                except GeneratorExit:
+                    pass
+                except Exception as e:
+                    raise e
+
+        return _loop(self._kernel, self._its, self._n)
+
+    def __aiter__(self):
+        async def _loop(kernel, its, n):
+            async with kernel as poll:
+                for x in its:
+                    await poll(n)
+                    yield x
+        return _loop(self._kernel, self._its, self._n)
+
+
 def ui_events():
     """
-    Gives you a async function you can call to process ui events while running a long
+    Gives you a function you can call to process ui events while running a long
     task inside a Jupyter cell.
+
+    Support both async and sync operation.
 
     .. code-block: python
        async with ui_events() as ui_poll:
@@ -91,22 +146,20 @@ def ui_events():
              await ui_poll(10)  # Process upto 10 UI events if any happened
              do_some_more_compute()
 
+        with ui_events() as ui_poll:
+          while some_condition:
+             ui_poll(10)  # Process upto 10 UI events if any happened
+             do_some_more_compute()
 
     - Delay processing `execute_request` IPython kernel events
     - Calls `kernel.do_one_iteration()`
     - Schedule replay of any blocked `execute_request` events upon
       exiting from the context manager
     """
-    kernel = KernelWrapper.get()
-
-    async def poll(n=1):
-        for _ in range(n):
-            await kernel.do_one_iteration()
-
-    yield poll
+    return KernelWrapper.get()
 
 
-async def with_ui_events(its, n=1):
+def with_ui_events(its, n=1):
     """
     Deal with kernel ui events while processing a long sequence
 
@@ -117,18 +170,10 @@ async def with_ui_events(its, n=1):
     - Inject calls to `kernel.do_one_iteration()` in between iterations
     - Schedule replay of any blocked `execute_request` events when data sequence is exhausted
     """
-    with ui_events() as poll:
-        try:
-            for x in its:
-                await poll(n)
-                yield x
-        except GeneratorExit:
-            pass
-        except Exception as e:
-            raise e
+    return KernelWrapper.get().wrap_iterator(its, n)
 
 
-async def run_ui_poll_loop(f, sleep=0.02, n=1):
+def run_ui_poll_loop(f, sleep=0.02, n=1):
     """
     Repeatedly call `f()` until it returns non-None value while also responding to widget events.
 
@@ -153,6 +198,6 @@ async def run_ui_poll_loop(f, sleep=0.02, n=1):
             x = f()
             yield x
 
-    async for x in with_ui_events(as_iterator(f, sleep), n):
+    for x in with_ui_events(as_iterator(f, sleep), n):
         if x is not None:
             return x
