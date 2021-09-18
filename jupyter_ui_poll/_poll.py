@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import time
+from inspect import iscoroutinefunction
 
 import zmq
 from IPython import get_ipython
@@ -18,17 +19,30 @@ class KernelWrapper:
         self._shell = shell
         self._kernel = kernel
         self._loop = loop
-        self._original_parent = (kernel._parent_ident, kernel.get_parent())
+        self._original_parent = (
+            kernel._parent_ident,
+            kernel.get_parent()  # ipykernel 6+
+            if hasattr(kernel, "get_parent")
+            else kernel._parent_header,  # ipykernel < 6
+        )
         self._events = []
         self._backup_execute_request = kernel.shell_handlers["execute_request"]
         self._aproc = None
+        self._kernel_is_async = iscoroutinefunction(self._backup_execute_request)
+
+        if self._kernel_is_async:  # ipykernel 6+
+            kernel.shell_handlers["execute_request"] = self._execute_request_async
+        else:
+            # ipykernel < 6
+            kernel.shell_handlers["execute_request"] = self._execute_request
 
         shell.events.register("post_run_cell", self._post_run_cell_hook)
-        kernel.shell_handlers["execute_request"] = self._execute_request_async
 
     def restore(self):
         if self._backup_execute_request is not None:
-            self._kernel.shell_handlers["execute_request"] = self._backup_execute_request
+            self._kernel.shell_handlers[
+                "execute_request"
+            ] = self._backup_execute_request
             self._backup_execute_request = None
 
     def _reset_output(self):
@@ -48,17 +62,27 @@ class KernelWrapper:
 
         sys.stdout.flush()
         sys.stderr.flush()
+        shell_stream = getattr(
+            kernel, "shell_stream", None
+        )  # ipykernel 6 vs 5 differences
+
         for stream, ident, parent in self._events:
             kernel.set_parent(ident, parent)
             if kernel._aborting:
                 kernel._send_abort_reply(stream, parent, ident)
             else:
-                await kernel.execute_request(stream, ident, parent)
+                rr = kernel.execute_request(stream, ident, parent)
+                if self._kernel_is_async:
+                    await rr
+
                 # replicate shell_dispatch behaviour
                 sys.stdout.flush()
                 sys.stderr.flush()
-                kernel._publish_status('idle', 'shell')
-                kernel.shell_stream.flush(zmq.POLLOUT)
+                if shell_stream is not None:  # 6+
+                    kernel._publish_status("idle", "shell")
+                    shell_stream.flush(zmq.POLLOUT)
+                else:
+                    kernel._publish_status("idle")
 
     async def do_one_iteration(self):
         try:
@@ -100,7 +124,9 @@ class KernelWrapper:
     @staticmethod
     def get():
         if KernelWrapper._current is None:
-            KernelWrapper._current = KernelWrapper(get_ipython(), asyncio.get_event_loop())
+            KernelWrapper._current = KernelWrapper(
+                get_ipython(), asyncio.get_event_loop()
+            )
         return KernelWrapper._current
 
 
@@ -130,6 +156,7 @@ class IteratorWrapper:
                 for x in its:
                     await poll(n)
                     yield x
+
         return _loop(self._kernel, self._its, self._n)
 
 
