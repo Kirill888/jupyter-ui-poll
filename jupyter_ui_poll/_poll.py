@@ -8,20 +8,75 @@ from IPython import get_ipython
 from tornado.queues import QueueEmpty
 
 
-async def _replay_events(kernel, events):
-    sys.stdout.flush()
-    sys.stderr.flush()
-    for stream, ident, parent in events:
-        kernel.set_parent(ident, parent)
-        if kernel._aborting:
-            kernel._send_abort_reply(stream, parent, ident)
-        else:
-            await kernel.execute_request(stream, ident, parent)
-            # replicate shell_dispatch behaviour
-            sys.stdout.flush()
-            sys.stderr.flush()
-            kernel._publish_status('idle', 'shell')
-            kernel.shell_stream.flush(zmq.POLLOUT)
+class KernelWrapper:
+    _current = None
+
+    def __init__(self, shell, loop) -> None:
+        kernel = shell.kernel
+
+        self._shell = shell
+        self._kernel = kernel
+        self._loop = loop
+        self._original_parent = (kernel._parent_ident, kernel.get_parent())
+        self._events = []
+        self._backup_execute_request = kernel.shell_handlers["execute_request"]
+
+        shell.events.register("post_run_cell", self._post_run_cell_hook)
+        kernel.shell_handlers["execute_request"] = self._execute_request_async
+
+    def restore(self):
+        if self._backup_execute_request is not None:
+            self._kernel.shell_handlers["execute_request"] = self._backup_execute_request
+            self._backup_execute_request = None
+
+    def _reset_output(self):
+        self._kernel.set_parent(*self._original_parent)
+
+    def _execute_request(self, stream, ident, parent):
+        # store away execute request for later and reset io back to the original cell
+        self._events.append((stream, ident, parent))
+        self._reset_output()
+
+    async def _execute_request_async(self, stream, ident, parent):
+        self._execute_request(stream, ident, parent)
+
+    async def replay(self):
+        kernel = self._kernel
+        self.restore()
+
+        sys.stdout.flush()
+        sys.stderr.flush()
+        for stream, ident, parent in self._events:
+            kernel.set_parent(ident, parent)
+            if kernel._aborting:
+                kernel._send_abort_reply(stream, parent, ident)
+            else:
+                await kernel.execute_request(stream, ident, parent)
+                # replicate shell_dispatch behaviour
+                sys.stdout.flush()
+                sys.stderr.flush()
+                kernel._publish_status('idle', 'shell')
+                kernel.shell_stream.flush(zmq.POLLOUT)
+
+    async def do_one_iteration(self):
+        try:
+            await self._kernel.do_one_iteration()
+            # reset stdio back to original cell
+            self._reset_output()
+        except QueueEmpty:  # it's probably a bug in ipykernel, .do_one_iteration() should not throw
+            return
+
+    def _post_run_cell_hook(self, _):
+        self._shell.events.unregister("post_run_cell", self._post_run_cell_hook)
+        self.restore()
+        KernelWrapper._current = None
+        asyncio.ensure_future(self.replay(), loop=self._loop)
+
+    @staticmethod
+    def get():
+        if KernelWrapper._current is None:
+            KernelWrapper._current = KernelWrapper(get_ipython(), asyncio.get_event_loop())
+        return KernelWrapper._current
 
 
 @contextmanager
@@ -31,7 +86,7 @@ def ui_events():
     task inside a Jupyter cell.
 
     .. code-block: python
-       with ui_events() as ui_poll:
+       async with ui_events() as ui_poll:
           while some_condition:
              await ui_poll(10)  # Process upto 10 UI events if any happened
              do_some_more_compute()
@@ -42,37 +97,13 @@ def ui_events():
     - Schedule replay of any blocked `execute_request` events upon
       exiting from the context manager
     """
-    shell = get_ipython()
-    kernel = shell.kernel
-    _backup_execute_request = kernel.shell_handlers["execute_request"]
-    original_parent = (kernel._parent_ident, kernel.get_parent())
-
-    events = []
-
-    async def _execute_request(stream, ident, parent):
-        # store away execute request for later and reset io back to the original cell
-        events.append((stream, ident, parent))
-        kernel.set_parent(*original_parent)
+    kernel = KernelWrapper.get()
 
     async def poll(n=1):
         for _ in range(n):
-            try:
-                await kernel.do_one_iteration()
-                # reset stdio back to original cell
-                kernel.set_parent(*original_parent)
-            except QueueEmpty:  # it's probably a bug in ipykernel, .do_one_iteration() should not throw
-                return
+            await kernel.do_one_iteration()
 
-    loop = asyncio.get_event_loop()
-    assert loop.is_running()
-
-    kernel.shell_handlers["execute_request"] = _execute_request
-    try:
-        yield poll
-    finally:
-        # Restore execute_request handler
-        kernel.shell_handlers["execute_request"] = _backup_execute_request
-        asyncio.ensure_future(_replay_events(kernel, events), loop=loop)
+    yield poll
 
 
 async def with_ui_events(its, n=1):
