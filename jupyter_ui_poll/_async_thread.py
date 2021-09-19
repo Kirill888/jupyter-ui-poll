@@ -40,6 +40,7 @@ class AsyncThread:
     def wrap(self, func):
         def sync_func(*args, **kwargs):
             return self.submit(func, *args, **kwargs).result()
+
         return sync_func
 
     def call_soon(self, func, *args):

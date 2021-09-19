@@ -1,7 +1,22 @@
 import asyncio
+from collections import abc
 import sys
 import time
 from inspect import iscoroutinefunction
+from typing import (
+    Any,
+    AsyncIterable,
+    AsyncIterator,
+    Callable,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import zmq
 from IPython import get_ipython
@@ -9,9 +24,11 @@ from tornado.queues import QueueEmpty
 
 from ._async_thread import AsyncThread
 
+T = TypeVar("T")
+
 
 class KernelWrapper:
-    _current = None
+    _current: Optional["KernelWrapper"] = None
 
     def __init__(self, shell, loop) -> None:
         kernel = shell.kernel
@@ -25,7 +42,7 @@ class KernelWrapper:
             if hasattr(kernel, "get_parent")
             else kernel._parent_header,  # ipykernel < 6
         )
-        self._events = []
+        self._events: List[Tuple[Any, Any, Any]] = []
         self._backup_execute_request = kernel.shell_handlers["execute_request"]
         self._aproc = None
         self._kernel_is_async = iscoroutinefunction(self._backup_execute_request)
@@ -89,7 +106,9 @@ class KernelWrapper:
             await self._kernel.do_one_iteration()
             # reset stdio back to original cell
             self._reset_output()
-        except QueueEmpty:  # it's probably a bug in ipykernel, .do_one_iteration() should not throw
+        except QueueEmpty:
+            # it's probably a bug in ipykernel,
+            # .do_one_iteration() should not throw
             return
 
     def _post_run_cell_hook(self, _):
@@ -118,11 +137,13 @@ class KernelWrapper:
         self._aproc.terminate()
         self._aproc = None
 
-    def wrap_iterator(self, its, n: int = 1):
+    def wrap_iterator(
+        self, its: Union[Iterable[T], AsyncIterable[T]], n: int = 1
+    ) -> "IteratorWrapper[T]":
         return IteratorWrapper(its, self, n=n)
 
     @staticmethod
-    def get():
+    def get() -> "KernelWrapper":
         if KernelWrapper._current is None:
             KernelWrapper._current = KernelWrapper(
                 get_ipython(), asyncio.get_event_loop()
@@ -130,14 +151,19 @@ class KernelWrapper:
         return KernelWrapper._current
 
 
-class IteratorWrapper:
-    def __init__(self, its, kernel: KernelWrapper, n: int = 1):
+class IteratorWrapper(Generic[T]):
+    def __init__(
+        self,
+        its: Union[Iterable[T], AsyncIterable[T]],
+        kernel: KernelWrapper,
+        n: int = 1,
+    ):
         self._its = its
         self._n = n
         self._kernel = kernel
 
-    def __iter__(self):
-        def _loop(kernel, its, n):
+    def __iter__(self) -> Iterator[T]:
+        def _loop(kernel: KernelWrapper, its: Iterable[T], n: int) -> Iterator[T]:
             with kernel as poll:
                 try:
                     for x in its:
@@ -148,14 +174,30 @@ class IteratorWrapper:
                 except Exception as e:
                     raise e
 
+        if not isinstance(self._its, abc.Iterable):
+            raise ValueError("Expect Iterable[T] on input")
+
         return _loop(self._kernel, self._its, self._n)
 
-    def __aiter__(self):
-        async def _loop(kernel, its, n):
+    def __aiter__(self) -> AsyncIterator[T]:
+        async def _loop(
+            kernel: KernelWrapper, its: Iterable[T], n: int
+        ) -> AsyncIterator[T]:
             async with kernel as poll:
                 for x in its:
                     await poll(n)
                     yield x
+
+        async def _loop_async(
+            kernel: KernelWrapper, its: AsyncIterable[T], n: int
+        ) -> AsyncIterator[T]:
+            async with kernel as poll:
+                async for x in its:
+                    await poll(n)
+                    yield x
+
+        if isinstance(self._its, abc.AsyncIterable):
+            return _loop_async(self._kernel, self._its, self._n)
 
         return _loop(self._kernel, self._its, self._n)
 
@@ -178,45 +220,51 @@ def ui_events():
              ui_poll(10)  # Process upto 10 UI events if any happened
              do_some_more_compute()
 
-    - Delay processing `execute_request` IPython kernel events
-    - Calls `kernel.do_one_iteration()`
-    - Schedule replay of any blocked `execute_request` events upon
+    - Delay processing ``execute_request`` IPython kernel events
+    - Calls ``kernel.do_one_iteration()``
+    - Schedule replay of any blocked ``execute_request`` events upon
       exiting from the context manager
     """
     return KernelWrapper.get()
 
 
-def with_ui_events(its, n=1):
+def with_ui_events(
+    its: Union[Iterable[T], AsyncIterable[T]], n: int = 1
+) -> IteratorWrapper[T]:
     """
     Deal with kernel ui events while processing a long sequence
 
     :param its: Iterator to pass through
     :param n:   Number of events to process in between items
 
-    - Delay processing `execute_request` IPython kernel events
-    - Inject calls to `kernel.do_one_iteration()` in between iterations
-    - Schedule replay of any blocked `execute_request` events when data sequence is exhausted
+    - Delay processing ``execute_request`` IPython kernel events
+    - Inject calls to ``kernel.do_one_iteration()`` in between iterations
+    - Schedule replay of any blocked ``execute_request`` events when data sequence is exhausted
     """
     return KernelWrapper.get().wrap_iterator(its, n)
 
 
-def run_ui_poll_loop(f, sleep=0.02, n=1):
+def run_ui_poll_loop(
+    f: Callable[[], Optional[T]], sleep: float = 0.02, n: int = 1
+) -> T:
     """
-    Repeatedly call `f()` until it returns non-None value while also responding to widget events.
+    Repeatedly call ``f()`` until it returns non-None value while also responding to widget events.
 
     This blocks execution of cells below in the notebook while still preserving
     interactivity of jupyter widgets.
 
-    :param f: Function to periodically call (`f()` should not block for long)
+    :param f: Function to periodically call (``f()`` should not block for long)
     :param sleep: Amount of time to sleep in between polling (in seconds, 1/50 is the default)
     :param n: Number of events to process per iteration
 
     Returns
     =======
-    First non-None value returned from `f()`
+    First non-None value returned from ``f()``
     """
 
-    def as_iterator(f, sleep):
+    def as_iterator(
+        f: Callable[[], Optional[T]], sleep: float
+    ) -> Iterator[Optional[T]]:
         x = None
         while x is None:
             if sleep is not None:
@@ -227,4 +275,7 @@ def run_ui_poll_loop(f, sleep=0.02, n=1):
 
     for x in with_ui_events(as_iterator(f, sleep), n):
         if x is not None:
-            return x
+            break
+
+    assert x is not None
+    return x
