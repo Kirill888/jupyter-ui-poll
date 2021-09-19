@@ -137,11 +137,6 @@ class KernelWrapper:
         self._aproc.terminate()
         self._aproc = None
 
-    def wrap_iterator(
-        self, its: Union[Iterable[T], AsyncIterable[T]], n: int = 1
-    ) -> "IteratorWrapper[T]":
-        return IteratorWrapper(its, self, n=n)
-
     @staticmethod
     def get() -> "KernelWrapper":
         if KernelWrapper._current is None:
@@ -153,14 +148,10 @@ class KernelWrapper:
 
 class IteratorWrapper(Generic[T]):
     def __init__(
-        self,
-        its: Union[Iterable[T], AsyncIterable[T]],
-        kernel: KernelWrapper,
-        n: int = 1,
+        self, its: Union[Iterable[T], AsyncIterable[T]], n: int = 1,
     ):
         self._its = its
         self._n = n
-        self._kernel = kernel
 
     def __iter__(self) -> Iterator[T]:
         def _loop(kernel: KernelWrapper, its: Iterable[T], n: int) -> Iterator[T]:
@@ -177,7 +168,7 @@ class IteratorWrapper(Generic[T]):
         if not isinstance(self._its, abc.Iterable):
             raise ValueError("Expect Iterable[T] on input")
 
-        return _loop(self._kernel, self._its, self._n)
+        return _loop(KernelWrapper.get(), self._its, self._n)
 
     def __aiter__(self) -> AsyncIterator[T]:
         async def _loop(
@@ -196,10 +187,11 @@ class IteratorWrapper(Generic[T]):
                     await poll(n)
                     yield x
 
+        kernel = KernelWrapper.get()
         if isinstance(self._its, abc.AsyncIterable):
-            return _loop_async(self._kernel, self._its, self._n)
+            return _loop_async(kernel, self._its, self._n)
 
-        return _loop(self._kernel, self._its, self._n)
+        return _loop(kernel, self._its, self._n)
 
 
 def ui_events():
@@ -209,7 +201,7 @@ def ui_events():
 
     Support both async and sync operation.
 
-    .. code-block: python
+    .. code-block:: python
        async with ui_events() as ui_poll:
           while some_condition:
              await ui_poll(10)  # Process upto 10 UI events if any happened
@@ -240,8 +232,10 @@ def with_ui_events(
     - Delay processing ``execute_request`` IPython kernel events
     - Inject calls to ``kernel.do_one_iteration()`` in between iterations
     - Schedule replay of any blocked ``execute_request`` events when data sequence is exhausted
+
+    Iterable returned from this can be used in both async and sync contexts.
     """
-    return KernelWrapper.get().wrap_iterator(its, n)
+    return IteratorWrapper(its, n=n)
 
 
 def run_ui_poll_loop(
