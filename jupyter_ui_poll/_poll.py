@@ -1,7 +1,8 @@
 import asyncio
-from collections import abc
 import sys
 import time
+from collections import abc
+from functools import singledispatch
 from inspect import iscoroutinefunction
 from typing import (
     Any,
@@ -146,9 +147,28 @@ class KernelWrapper:
         return KernelWrapper._current
 
 
-class IteratorWrapper(Generic[T]):
+class IteratorWrapperAsync(abc.AsyncIterable, Generic[T]):
     def __init__(
-        self, its: Union[Iterable[T], AsyncIterable[T]], n: int = 1,
+        self, its: AsyncIterable[T], n: int = 1,
+    ):
+        self._its = its
+        self._n = n
+
+    def __aiter__(self) -> AsyncIterator[T]:
+        async def _loop(
+            kernel: KernelWrapper, its: AsyncIterable[T], n: int
+        ) -> AsyncIterator[T]:
+            async with kernel as poll:
+                async for x in its:
+                    await poll(n)
+                    yield x
+
+        return _loop(KernelWrapper.get(), self._its, self._n)
+
+
+class IteratorWrapper(abc.Iterable, Generic[T]):
+    def __init__(
+        self, its: Iterable[T], n: int = 1,
     ):
         self._its = its
         self._n = n
@@ -165,9 +185,6 @@ class IteratorWrapper(Generic[T]):
                 except Exception as e:
                     raise e
 
-        if not isinstance(self._its, abc.Iterable):
-            raise ValueError("Expect Iterable[T] on input")
-
         return _loop(KernelWrapper.get(), self._its, self._n)
 
     def __aiter__(self) -> AsyncIterator[T]:
@@ -179,19 +196,7 @@ class IteratorWrapper(Generic[T]):
                     await poll(n)
                     yield x
 
-        async def _loop_async(
-            kernel: KernelWrapper, its: AsyncIterable[T], n: int
-        ) -> AsyncIterator[T]:
-            async with kernel as poll:
-                async for x in its:
-                    await poll(n)
-                    yield x
-
-        kernel = KernelWrapper.get()
-        if isinstance(self._its, abc.AsyncIterable):
-            return _loop_async(kernel, self._its, self._n)
-
-        return _loop(kernel, self._its, self._n)
+        return _loop(KernelWrapper.get(), self._its, self._n)
 
 
 def ui_events():
@@ -220,9 +225,8 @@ def ui_events():
     return KernelWrapper.get()
 
 
-def with_ui_events(
-    its: Union[Iterable[T], AsyncIterable[T]], n: int = 1
-) -> IteratorWrapper[T]:
+@singledispatch
+def with_ui_events(its, n: int = 1):
     """
     Deal with kernel ui events while processing a long sequence
 
@@ -235,7 +239,17 @@ def with_ui_events(
 
     Iterable returned from this can be used in both async and sync contexts.
     """
+    raise TypeError("Expect Iterable[T]|AsyncIterable[T]")
+
+
+@with_ui_events.register(abc.Iterable)
+def with_ui_events_sync(its: Iterable[T], n: int = 1) -> IteratorWrapper[T]:
     return IteratorWrapper(its, n=n)
+
+
+@with_ui_events.register(abc.AsyncIterable)
+def with_ui_events_async(its: AsyncIterable[T], n: int = 1) -> AsyncIterable[T]:
+    return IteratorWrapperAsync(its, n=n)
 
 
 def run_ui_poll_loop(
