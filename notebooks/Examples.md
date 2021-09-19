@@ -28,11 +28,11 @@ example](ComplexUIExample.ipynb), it demonstrates implementation a blocking UI
 primitive as a library.
 
 ```python
+import asyncio
 import time
 
 import ipywidgets as w
 from IPython.display import display
-
 from jupyter_ui_poll import run_ui_poll_loop, ui_events, with_ui_events
 ```
 
@@ -70,9 +70,9 @@ internals of the running IPython kernel, hence this function needs to be used
 inside `with` statement, so that IPython state can be restored to normal once
 your code is done, even if errors have happened.
 
-You can supply how many events should be processed everytime you call `ui_poll`
+You can supply how many events should be processed every time you call `ui_poll`
 function, default is `1`. You probably want to use larger value if you have
-highly interactve widgets that generate a lot of events, like a map, or if your
+highly interactive widgets that generate a lot of events, like a map, or if your
 poll frequency is low. One should aim for something like 100 events per second.
 If you notice that UI lags and is not responsive try increasing poll frequency
 and if that is not possible, increase number of UI events you process per
@@ -187,3 +187,85 @@ important that it doesn't execute until `dt` is known.
 ```python
 print(f"Took {dt:.1f} seconds to click {n_times}")
 ```
+
+Cell  below contains intentional error.
+
+Cells below this one should not execute as part of `Run All Below` command you can still run them later of course.
+
+```python
+this_will_raise_an_error()
+```
+
+## Async Operations
+
+We also support async mode of operation if desired. Just use `async with` or `async for`.
+
+```python
+btn = test_button()
+print("Press this button 10 times to terminate")
+display(btn)
+
+async with ui_events() as ui_poll:
+    while int(btn.description) < 10:
+        print(btn.description, end="")
+        await ui_poll(11)  # Process upto 11 ui events per iteration
+        await asyncio.sleep(0.1)  # Simulate async processing
+
+print("... done")
+```
+
+### Async Iterable
+
+Iterable returned from `with_ui_events` can also be used in async context. It can wrap async/sync iterators, the result can be iterated with either plain `for` or `async for` when wrapping normal iterators, and only with `async for` when wrapping `async` iterators. 
+
+```python
+btn = test_button()
+print("Press this button a few times")
+display(btn)
+
+async for i in with_ui_events(range(55), 10):  # Process upto 10 ui events per iteration
+    if int(btn.description) >= 5:
+        print("✋", end="")
+        break  # Test early exit
+    print(btn.description, end="")  # Verify UI state changes
+    await asyncio.sleep(0.1)  # Simulate Async computation
+print("... done")
+```
+
+### Test Async Iterable wrapping
+
+```python
+from collections import abc
+
+
+async def async_range(n):
+    for i in range(n):
+        yield i
+
+
+its0 = async_range(55)
+its = with_ui_events(its0, 10)
+
+print(
+    f"""Iterable:      {isinstance(its0, abc.Iterable)}, {isinstance(its, abc.Iterable)} 
+AsyncIterable: {isinstance(its0, abc.AsyncIterable)}, {isinstance(its, abc.AsyncIterable)}"""
+)
+```
+
+One can create and wrap iterator in an earlier cell and use it later.
+
+```python
+btn = test_button()
+print("Press this button a few times")
+display(btn)
+
+async for i in its:  # Process upto 10 ui events per iteration
+    if int(btn.description) >= 5:
+        print("✋", end="")
+        break  # Test early exit
+    print(btn.description, end="")  # Verify UI state changes
+    await asyncio.sleep(0.1)  # Simulate Async computation
+print("... done")
+```
+
+------------------------------------------------------------
