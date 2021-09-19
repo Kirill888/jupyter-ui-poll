@@ -142,6 +142,6 @@ Basic idea was copied from ``ipython_blocking`` [#]_ project:
 .. [#] https://github.com/jupyter-widgets/ipywidgets
 .. [#] https://github.com/kafonek/ipython_blocking
 
-.. _Example notebook : notebooks/Examples.ipynb
-.. _run it : https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/develop?filepath=notebooks%2FExamples.ipynb
-.. _Binder : https://mybinder.org/
+.. _Example notebook: notebooks/Examples.ipynb
+.. _run it: https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/develop?filepath=notebooks%2FExamples.ipynb
+.. _Binder: https://mybinder.org/
