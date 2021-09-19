@@ -13,7 +13,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-#print(sys.path)
+from jupyter_ui_poll import __version__
 
 
 # -- Project information -----------------------------------------------------
@@ -22,9 +22,8 @@ project = "jupyter-ui-poll"
 copyright = "2021, Kirill Kouzoubov"
 author = "Kirill Kouzoubov"
 
-version = "0.2.0"
-# The full version, including alpha/beta/rc tags
-release = version
+release = __version__
+version = ".".join(release.split(".")[:2])
 
 
 # -- General configuration ---------------------------------------------------
