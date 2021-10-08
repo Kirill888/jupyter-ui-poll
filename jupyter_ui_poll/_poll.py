@@ -3,7 +3,7 @@ import sys
 import time
 from collections import abc
 from functools import singledispatch
-from inspect import iscoroutinefunction
+from inspect import iscoroutinefunction, isawaitable
 from typing import (
     Any,
     AsyncIterable,
@@ -46,9 +46,8 @@ class KernelWrapper:
         self._events: List[Tuple[Any, Any, Any]] = []
         self._backup_execute_request = kernel.shell_handlers["execute_request"]
         self._aproc = None
-        self._kernel_is_async = iscoroutinefunction(self._backup_execute_request)
 
-        if self._kernel_is_async:  # ipykernel 6+
+        if iscoroutinefunction(self._backup_execute_request):  # ipykernel 6+
             kernel.shell_handlers["execute_request"] = self._execute_request_async
         else:
             # ipykernel < 6
@@ -90,7 +89,7 @@ class KernelWrapper:
                 kernel._send_abort_reply(stream, parent, ident)
             else:
                 rr = kernel.execute_request(stream, ident, parent)
-                if self._kernel_is_async:
+                if isawaitable(rr):
                     await rr
 
                 # replicate shell_dispatch behaviour
