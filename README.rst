@@ -75,6 +75,8 @@ This library requires Python 3.6 or greater.
 .. code-block::
 
   pip install jupyter-ui-poll
+  # or with conda/mamba
+  conda install -c kirill-odc jupyter-ui-poll
 
 
 Technical Details

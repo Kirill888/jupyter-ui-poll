@@ -42,6 +42,7 @@ For a more detailed tutorial see `Example notebook`_, you can also `run it`_ rig
 
 
 .. toctree::
+   :hidden:
 
    install.rst
    api.rst
