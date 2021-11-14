@@ -103,15 +103,18 @@ class KernelWrapper:
 
     async def do_one_iteration(self):
         try:
-            await self._kernel.do_one_iteration()
-            # reset stdio back to original cell
-            self._reset_output()
+            rr = self._kernel.do_one_iteration()
+            if isawaitable(rr):
+                await rr
         except QueueEmpty:
             # it's probably a bug in ipykernel,
             # .do_one_iteration() should not throw
             return
+        finally:
+            # reset stdio back to original cell
+            self._reset_output()
 
-    def _post_run_cell_hook(self, _):
+    def _post_run_cell_hook(self, *args, **kw):
         self._shell.events.unregister("post_run_cell", self._post_run_cell_hook)
         self.restore()
         KernelWrapper._current = None
