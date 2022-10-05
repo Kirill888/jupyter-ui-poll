@@ -54,6 +54,7 @@ class KernelWrapper:
             kernel.shell_handlers["execute_request"] = self._execute_request
 
         shell.events.register("post_run_cell", self._post_run_cell_hook)
+        shell.events.register("post_execute", self._post_run_cell_hook)
 
     def restore(self):
         if self._backup_execute_request is not None:
@@ -116,6 +117,7 @@ class KernelWrapper:
 
     def _post_run_cell_hook(self, *args, **kw):
         self._shell.events.unregister("post_run_cell", self._post_run_cell_hook)
+        self._shell.events.unregister("post_execute", self._post_run_cell_hook)
         self.restore()
         KernelWrapper._current = None
         asyncio.ensure_future(self.replay(), loop=self._loop)
