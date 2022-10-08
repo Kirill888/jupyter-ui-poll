@@ -55,27 +55,27 @@ def make_sample_ui(width="600px"):
 
 
 def blocking_ui(default="beige", timeout=10):
-    """ Displays a UI then blocks until user makes a choice or timeout happens.
+    """Displays a UI then blocks until user makes a choice or timeout happens.
 
-        Returns
-        =======
-         (color, 'user')       if user selects a color in time
-         (default, 'timeout')  in case of a timeout
+    Returns
+    =======
+     (color, 'user')       if user selects a color in time
+     (default, 'timeout')  in case of a timeout
     """
     state = make_sample_ui()
 
     def poll_cbk():
-        """ This function is called periodically.
+        """This function is called periodically.
 
-            - Check for user input
-            - Check for timeout
-            - Update timeout progress bar
+        - Check for user input
+        - Check for timeout
+        - Update timeout progress bar
 
-            Returns
-            -------
-            (color: str, 'user')      -- when user selection detected
-            (default: str, 'timeout') -- when no user selection for too long
-            None                      -- in all other cases
+        Returns
+        -------
+        (color: str, 'user')      -- when user selection detected
+        (default: str, 'timeout') -- when no user selection for too long
+        None                      -- in all other cases
         """
         if state.color is not None:  # User selected some color
             return state.color, "user"
