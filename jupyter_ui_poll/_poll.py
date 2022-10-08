@@ -327,7 +327,6 @@ def run_ui_poll_loop(
 
     for x in with_ui_events(as_iterator(f, sleep), n):
         if x is not None:
-            break
+            return x
 
-    assert x is not None
-    return x
+    raise RuntimeError("hm...")  # for mypy sake
