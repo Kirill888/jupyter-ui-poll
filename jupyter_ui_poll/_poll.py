@@ -18,13 +18,13 @@ from typing import (
     TypeVar,
 )
 
-import zmq
 from IPython import get_ipython
-from tornado.queues import QueueEmpty
 
 from ._async_thread import AsyncThread
 
 T = TypeVar("T")
+
+ZMQ_POLLOUT = 2  # zmq.POLLOUT without zmq dependency
 
 
 class KernelWrapper:
@@ -97,7 +97,7 @@ class KernelWrapper:
                 sys.stderr.flush()
                 if shell_stream is not None:  # 6+
                     kernel._publish_status("idle", "shell")
-                    shell_stream.flush(zmq.POLLOUT)
+                    shell_stream.flush(ZMQ_POLLOUT)
                 else:
                     kernel._publish_status("idle")
 
@@ -106,7 +106,7 @@ class KernelWrapper:
             rr = self._kernel.do_one_iteration()
             if isawaitable(rr):
                 await rr
-        except QueueEmpty:
+        except Exception:  # pylint: disable=broad-except
             # it's probably a bug in ipykernel,
             # .do_one_iteration() should not throw
             return
