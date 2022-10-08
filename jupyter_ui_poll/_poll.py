@@ -3,7 +3,7 @@ import sys
 import time
 from collections import abc
 from functools import singledispatch
-from inspect import iscoroutinefunction, isawaitable
+from inspect import isawaitable, iscoroutinefunction
 from typing import (
     Any,
     AsyncIterable,
@@ -16,7 +16,6 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
-    Union,
 )
 
 import zmq
@@ -153,7 +152,9 @@ class KernelWrapper:
 
 class IteratorWrapperAsync(abc.AsyncIterable, Generic[T]):
     def __init__(
-        self, its: AsyncIterable[T], n: int = 1,
+        self,
+        its: AsyncIterable[T],
+        n: int = 1,
     ):
         self._its = its
         self._n = n
@@ -172,7 +173,9 @@ class IteratorWrapperAsync(abc.AsyncIterable, Generic[T]):
 
 class IteratorWrapper(abc.Iterable, Generic[T]):
     def __init__(
-        self, its: Iterable[T], n: int = 1,
+        self,
+        its: Iterable[T],
+        n: int = 1,
     ):
         self._its = its
         self._n = n
