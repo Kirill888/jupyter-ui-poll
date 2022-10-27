@@ -52,8 +52,7 @@ class KernelWrapper:
             # ipykernel < 6
             kernel.shell_handlers["execute_request"] = self._execute_request
 
-        shell.events.register("post_run_cell", self._post_run_cell_hook)
-        shell.events.register("post_execute", self._post_run_cell_hook)
+        shell.events.register("post_execute", self._post_execute_hook)
 
     def restore(self):
         if self._backup_execute_request is not None:
@@ -114,9 +113,8 @@ class KernelWrapper:
             # reset stdio back to original cell
             self._reset_output()
 
-    def _post_run_cell_hook(self, *args, **kw):
-        self._shell.events.unregister("post_run_cell", self._post_run_cell_hook)
-        self._shell.events.unregister("post_execute", self._post_run_cell_hook)
+    def _post_execute_hook(self, *args, **kw):
+        self._shell.events.unregister("post_execute", self._post_execute_hook)
         self.restore()
         KernelWrapper._current = None
         asyncio.ensure_future(self.replay(), loop=self._loop)
