@@ -35,5 +35,5 @@ sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.5
 tornado==6.3.3
 traitlets==5.1.0
-urllib3==1.26.17
+urllib3==1.26.18
 wcwidth==0.2.5
