@@ -2,8 +2,7 @@
 jupyter-ui-poll
 ===============
 
-.. image:: https://mybinder.org/badge_logo.svg
- :target: `run it`_
+|Documentation Status| |Binder|
 
 Block Jupyter cell execution while interacting with widgets.
 
@@ -59,7 +58,7 @@ Quick, self contained example:
    # Wait for user to press the button
    with ui_events() as poll:
        while ui_done is False:
-           poll(10)          # React to UI events (upto 10 at a time)
+           poll(10)          # React to UI events (up to 10 at a time)
            print('.', end='')
            time.sleep(0.1)
    print('done')
@@ -76,7 +75,7 @@ This library requires Python 3.6 or greater.
 
   pip install jupyter-ui-poll
   # or with conda/mamba
-  conda install -c kirill-odc jupyter-ui-poll
+  conda install -c conda-forge jupyter-ui-poll
 
 
 Technical Details
@@ -87,7 +86,7 @@ interactive data investigation apps directly inside Jupyter notebook or Jupyter
 lab environment. Jupyter is great at displaying data and ``ipywidgets`` provide
 a mechanism to get input from the user in a more convenient way than entering or
 changing Python code inside a Jupyter cell. Developer can construct an
-interactive user interface often used to parameterise information display or
+interactive user interface often used to parameterize information display or
 other kinds of computation.
 
 Interactivity is handled with callbacks, ``ipywidget`` GUI is HTML based, user
@@ -147,3 +146,10 @@ Basic idea was copied from ``ipython_blocking`` [#]_ project:
 .. _Example notebook: notebooks/Examples.ipynb
 .. _run it: https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/develop?filepath=notebooks%2FExamples.ipynb
 .. _Binder: https://mybinder.org/
+
+.. |Documentation Status| image:: https://readthedocs.org/projects/jupyter-ui-poll/badge/?version=latest
+   :target: https://jupyter-ui-poll.readthedocs.io/en/latest/?badge=latest
+
+.. |Binder| image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/kirill888/jupyter-ui-poll/develop?filepath=notebooks%2FExamples.ipynb
+   :alt: Run Examples in Binder
