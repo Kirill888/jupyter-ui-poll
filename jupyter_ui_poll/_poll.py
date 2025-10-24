@@ -52,7 +52,12 @@ class KernelWrapper:
             # ipykernel < 6
             kernel.shell_handlers["execute_request"] = self._execute_request
 
-        shell.events.register("post_execute", self._post_execute_hook)
+        # Previously, we used "post_execute", but a comm message handler can also trigger this event:
+        #  https://github.com/ipython/comm/blob/73e28fc4adaca9b05dd437d70717480be19ce25b/comm/base_comm.py#L151
+        # Instead, we now use the "post_run_cell" event, which is also triggered after the cell is executed.
+        # However, "post_run_cell" is not triggered, it's unclear when this happens, but it should not happen
+        # for normal cell execution.
+        shell.events.register("post_run_cell", self._post_run_cell)
 
     def restore(self):
         if self._backup_execute_request is not None:
@@ -113,8 +118,8 @@ class KernelWrapper:
             # reset stdio back to original cell
             self._reset_output()
 
-    def _post_execute_hook(self, *args, **kw):
-        self._shell.events.unregister("post_execute", self._post_execute_hook)
+    def _post_run_cell(self, *args, **kw):
+        self._shell.events.unregister("post_run_cell", self._post_run_cell)
         self.restore()
         KernelWrapper._current = None
         asyncio.ensure_future(self.replay(), loop=self._loop)
