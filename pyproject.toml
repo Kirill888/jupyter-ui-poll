@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "jupyter-ui-poll"
-version = "1.0.0"
+version = "1.1.0"
 description = "Block jupyter cell execution while interacting with widgets"
 readme = { file = "README.rst", content-type = "text/x-rst" }
 requires-python = ">=3.8"
