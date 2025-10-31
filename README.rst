@@ -1,6 +1,5 @@
-===============
 jupyter-ui-poll
-===============
+###############
 
 |Documentation Status| |Binder|
 
@@ -66,7 +65,7 @@ Quick, self contained example:
 For a more detailed tutorial see `Example notebook`_, you can also `run it`_ right now using awesome `Binder`_ service.
 
 Installation
-============
+############
 
 This library requires Python 3.6 or greater.
 
@@ -79,7 +78,7 @@ This library requires Python 3.6 or greater.
 
 
 Technical Details
-=================
+#################
 
 Jupyter widgets (``ipywidgets``) provide an excellent foundation to develop
 interactive data investigation apps directly inside Jupyter notebook or Jupyter
