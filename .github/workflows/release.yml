@@ -14,21 +14,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.8"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install wheel
+          pip install flit
           pip install twine
 
       - name: Build Packages
         run: |
-          python setup.py bdist_wheel
-          python setup.py sdist
+          flit build
 
       - name: Check Distribution Files
         run: |
+          twine --version
           twine check dist/*
 
       - name: Publish to PyPI

@@ -1,5 +1,0 @@
-prune .github
-prune binder
-prune notebooks
-prune scripts
-exclude .readthedocs.yaml
