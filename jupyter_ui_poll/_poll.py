@@ -39,14 +39,16 @@ class KernelWrapper:
         self._loop = loop
         self._original_parent = (
             kernel._parent_ident,
-            kernel.get_parent()  # ipykernel 6+
-            if hasattr(kernel, "get_parent")
-            else kernel._parent_header,  # ipykernel < 6
+            (
+                kernel.get_parent()  # ipykernel 6+
+                if hasattr(kernel, "get_parent")
+                else kernel._parent_header
+            ),  # ipykernel < 6
         )
         self._events: List[Tuple[Any, Any, Any]] = []
         self._backup_execute_request = kernel.shell_handlers["execute_request"]
         self._backup_main_asyncio_lock = None
-        if hasattr(kernel, "_main_asyncio_lock"): # ipykernel 7+
+        if hasattr(kernel, "_main_asyncio_lock"):  # ipykernel 7+
             # Introduced in https://github.com/ipython/ipykernel/pull/1430
             # Does not seem to have a very good reason to be introduced, only to reduce flakiness
             self._backup_main_asyncio_lock = kernel._main_asyncio_lock
@@ -68,9 +70,9 @@ class KernelWrapper:
 
     def restore(self):
         if self._backup_execute_request is not None:
-            self._kernel.shell_handlers[
-                "execute_request"
-            ] = self._backup_execute_request
+            self._kernel.shell_handlers["execute_request"] = (
+                self._backup_execute_request
+            )
             self._backup_execute_request = None
             if self._backup_main_asyncio_lock is not None:
                 self._kernel._main_asyncio_lock = self._backup_main_asyncio_lock
