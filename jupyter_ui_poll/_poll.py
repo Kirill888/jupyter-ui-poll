@@ -4,7 +4,7 @@ import sys
 import time
 from collections import abc
 from functools import singledispatch
-from inspect import isawaitable, iscoroutinefunction
+from inspect import isawaitable, iscoroutinefunction, signature
 from typing import (
     Any,
     AsyncIterable,
@@ -28,11 +28,81 @@ T = TypeVar("T")
 ZMQ_POLLOUT = 2  # zmq.POLLOUT without zmq dependency
 
 
+def _noop() -> None:
+    pass
+
+
+def _get_do_one_iteration(kernel) -> Tuple[Callable[[], Any], Callable[[], None]]:
+    """
+    Return ``(do_one_iteration, resync)``.
+
+    ``do_one_iteration`` processes at most one pending shell message. ``resync`` must
+    be called on the main thread once polling is over.
+
+    ipykernel 7 receives shell messages on a separate shell channel thread and
+    forwards them to the main thread over an inproc socket. ``do_one_iteration()``
+    no longer sees those messages (7.0) and was then removed (7.1), so we read one
+    message from that socket and hand it to ``kernel.dispatch_shell`` ourselves.
+    Older kernels keep using ``kernel.do_one_iteration()``.
+    """
+    manager = getattr(getattr(kernel, "shell_channel_thread", None), "manager", None)
+    if manager is None:
+        if hasattr(kernel, "do_one_iteration"):
+            return kernel.do_one_iteration, _noop
+        raise RuntimeError(
+            "jupyter-ui-poll does not support this kernel: it has neither"
+            " do_one_iteration() nor an ipykernel 7 shell channel thread"
+        )
+    return _ipykernel7_do_one_iteration(kernel, manager)
+
+
+def _ipykernel7_do_one_iteration(
+    kernel, manager
+) -> Tuple[Callable[[], Any], Callable[[], None]]:
+    import zmq  # always available here: ipykernel depends on pyzmq
+
+    try:
+        pair = manager._shell_channel_to_main
+        socket = pair.to_socket
+    except AttributeError as e:
+        raise RuntimeError(
+            "jupyter-ui-poll does not support this ipykernel version:"
+            " cannot find the shell channel socket of the main shell"
+        ) from e
+
+    dispatch_shell = kernel.dispatch_shell
+    # ipykernel 7.4 added `concurrent`: process the message without publishing
+    # busy/idle status, as it does for comm messages received during async cells.
+    kwargs = {}
+    if "concurrent" in signature(dispatch_shell).parameters:
+        kwargs["concurrent"] = True
+
+    async def do_one_iteration():
+        try:
+            msg = socket.recv_multipart(zmq.NOBLOCK, copy=False)
+        except zmq.Again:
+            return
+        await dispatch_shell(msg, subshell_id=None, **kwargs)
+
+    def resync():
+        # The kernel's ZMQStream watches the same socket. Its file descriptor only
+        # signals state changes, so after we have been reading behind its back it can
+        # miss that messages are waiting and stop receiving altogether. flush() reads
+        # anything pending, hands it to the kernel as usual and re-arms the stream.
+        stream = getattr(pair, "to_stream", None)
+        if stream is not None and not stream.closed():
+            stream.flush(zmq.POLLIN)
+
+    return do_one_iteration, resync
+
+
 class KernelWrapper:
     _current: Optional["KernelWrapper"] = None
 
     def __init__(self, shell, loop) -> None:
         kernel = shell.kernel
+        # Resolve this first: it raises on unsupported kernels, before we patch anything.
+        self._do_one_iteration, self._resync = _get_do_one_iteration(kernel)
 
         self._shell = shell
         self._kernel = kernel
@@ -99,27 +169,32 @@ class KernelWrapper:
             kernel, "shell_stream", None
         )  # ipykernel 6 vs 5 differences
 
-        for stream, ident, parent in self._events:
-            kernel.set_parent(ident, parent)
-            if kernel._aborting:
-                kernel._send_abort_reply(stream, parent, ident)
-            else:
-                rr = kernel.execute_request(stream, ident, parent)
-                if isawaitable(rr):
-                    await rr
-
-                # replicate shell_dispatch behaviour
-                sys.stdout.flush()
-                sys.stderr.flush()
-                if shell_stream is not None:  # 6+
-                    kernel._publish_status("idle", "shell")
-                    shell_stream.flush(ZMQ_POLLOUT)
+        try:
+            for stream, ident, parent in self._events:
+                kernel.set_parent(ident, parent)
+                if kernel._aborting:
+                    kernel._send_abort_reply(stream, parent, ident)
                 else:
-                    kernel._publish_status("idle")
+                    rr = kernel.execute_request(stream, ident, parent)
+                    if isawaitable(rr):
+                        await rr
+
+                    # replicate shell_dispatch behaviour
+                    sys.stdout.flush()
+                    sys.stderr.flush()
+                    if shell_stream is not None:  # 6+
+                        kernel._publish_status("idle", "shell")
+                        shell_stream.flush(ZMQ_POLLOUT)
+                    else:
+                        kernel._publish_status("idle")
+        finally:
+            # Messages that arrived after polling stopped are processed only now,
+            # after the deferred cells, so they cannot overtake them.
+            self._resync()
 
     async def do_one_iteration(self):
         try:
-            rr = self._kernel.do_one_iteration()
+            rr = self._do_one_iteration()
             if isawaitable(rr):
                 await rr
         except Exception:  # pylint: disable=broad-except
